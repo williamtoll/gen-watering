@@ -5,8 +5,12 @@ from datetime import datetime, timedelta
 from dateutil.rrule import rrule, DAILY, WEEKLY, MONTHLY, YEARLY
 import asyncpg
 from response_model import APIResponse  # Import the response model
+from dotenv import load_dotenv
 import os
 import logging
+import pendulum
+from fastapi.middleware.cors import CORSMiddleware
+load_dotenv()
 
 # Configure logging
 logging.basicConfig(
@@ -18,6 +22,7 @@ logging.basicConfig(
 
 # PostgreSQL connection settings
 DB_USER = os.getenv("POSTGRES_USER")
+print(DB_USER)
 DB_PASSWORD = os.getenv("POSTGRES_PASSWORD")
 DB_NAME = os.getenv("POSTGRES_DB")
 DB_HOST = os.getenv("POSTGRES_HOST")
@@ -25,6 +30,14 @@ DB_PORT = os.getenv("POSTGRES_PORT", "5432")  # Default to 5432 if not set
 
 
 app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Frequency mapping for rrule
 FREQUENCY_MAP = {
@@ -105,6 +118,7 @@ async def get_schedules():
                 "duration_minutes": row["duration_minutes"],
                 "device_name": row["device_name"],
                 "status": row["status"],
+                "frequency": row["frequency"],
                 "id": row["id"],
             }
             for row in rows
@@ -119,6 +133,52 @@ async def get_schedules():
             status="error", message="Failed to fetch schedules.", error_reason=str(e)
         )
 
+
+def formatDuration(duration):
+
+    duration_item = pendulum.duration(
+        hours=duration.seconds // 3600,
+        minutes=(duration.seconds % 3600) // 60,
+        seconds=duration.seconds % 60,
+    )
+    formatted_duration = duration_item.in_words(locale='es')
+    return f"Duración: {formatted_duration}"
+@app.get("/api/all-schedules", response_model=APIResponse)
+async def get_schedules():
+    """Fetch schedules with occurrences and device information."""
+    try:
+        conn = await connect_db()
+        query = """
+        SELECT s.*, d.name as device_name, s.status, d.id as device_id 
+        FROM schedule s
+        JOIN device d ON s.fk_device_schedule = d.id
+        ORDER BY s.start_date desc;
+        """
+        rows = await conn.fetch(query)
+        print(rows)
+        await conn.close()
+        schedules = [
+            {
+                "title": f"{row['device_name']} {formatDuration(row['duration'])} ",
+                "start": row["start_date"].isoformat(),
+                "end": row["end_date"].isoformat(),
+                "duration": f"{row['duration']}",
+                "device_name": row["device_name"],
+                "status": row["status"],
+                "frequency": row["frequency"],
+                "id": row["id"],
+            }
+            for row in rows
+        ]
+        return APIResponse(
+            status="success",
+            message="Schedules fetched successfully.",
+            result=schedules,
+        )
+    except Exception as e:
+        return APIResponse(
+            status="error", message="Failed to fetch schedules.", error_reason=str(e)
+        )
 
 @app.post("/api/generate_schedule", response_model=APIResponse)
 async def generate_schedule(request: ScheduleRequest):
@@ -157,7 +217,7 @@ async def generate_schedule(request: ScheduleRequest):
         async with conn.transaction():
             for occ in occurrences:
                 await conn.execute(
-                    "INSERT INTO schedule (start_date, end_date, fk_device_schedule, duration, status) VALUES ($1, $2, $3, $4,'pending')",
+                    "INSERT INTO schedule (start_date, end_date, fk_device_schedule, duration,  status) VALUES ($1, $2, $3, $4,'pending')",
                     occ["start"],
                     occ["end"],
                     request.device_id,
@@ -184,18 +244,22 @@ async def generate_schedule(request: ScheduleRequest):
 async def generate_schedule(request: ScheduleRequest):
     logging.info("request")
     logging.info(request)
+    print('entra a crear schedule')
+    print(request)
     """Generate recurring schedules based on input parameters."""
-    end = request.start_date + timedelta(minutes=request.duration)
+    # end = request.start_date + timedelta(minutes=request.duration)
     # Store occurrences in the PostgreSQL database
     try:
         conn = await connect_db()
         async with conn.transaction():
             await conn.execute(
-                "INSERT INTO schedule (start_date, end_date, fk_device_schedule, duration, status) VALUES ($1, $2, $3, $4,'pending')",
+                "INSERT INTO schedule (start_date, end_date, fk_device_schedule, duration, interval, frequency, status) VALUES ($1, $2, $3, $4,$5, $6, 'pending')",
                 request.start_date,
-                end,
+                request.end_date,
                 request.device_id,
                 timedelta(minutes=request.duration),
+                request.interval,
+                request.frequency
             )
 
             logging.info("inserted successfully")
@@ -241,6 +305,52 @@ async def delete_schedule(
         return APIResponse(
             status="error", message="Failed to delete schedule.", error_reason=str(e)
         )
+
+
+# update schedule
+@app.put("/api/schedules/{schedule_id}", response_model=APIResponse)
+
+async def update_schedule(
+    request: ScheduleRequest,
+    schedule_id: int = Path(..., description="ID of the schedule to update"),
+):
+    logging.info("request")
+    logging.info(request)
+    print( timedelta(minutes=request.duration))
+    print(request);
+    """Update a schedule in the database by ID."""
+    try:
+        conn = await connect_db()
+
+        # Update the schedule in the database
+        result = await conn.execute(
+            "UPDATE schedule SET start_date = $1, end_date = $2, fk_device_schedule = $3, duration = $4, frequency = $5, interval = $6 WHERE id = $7",
+            request.start_date,
+            request.end_date,
+            request.device_id,
+            timedelta(minutes=request.duration),
+            request.frequency,
+            request.interval,
+            schedule_id,
+        )
+        await conn.close()
+
+        # Check if a row was updated
+        if result == "UPDATE 0":
+            raise HTTPException(
+                status_code=404, detail=f"Schedule with ID {schedule_id} not found"
+            )
+
+        return APIResponse(
+            status="success",
+            message="Schedule updated successfully.",
+            result={"schedule_id": schedule_id},
+        )
+    except Exception as e:
+        return APIResponse(
+            status="error", message="Failed to update schedule.", error_reason=str(e)
+        )
+
 
 
 # Run the server: uvicorn main:app --reload
