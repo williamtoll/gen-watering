@@ -164,8 +164,10 @@ async def get_schedules():
                 "end": row["end_date"].isoformat(),
                 "duration": f"{row['duration']}",
                 "device_name": row["device_name"],
+                "device_id": row["device_id"],
                 "status": row["status"],
                 "frequency": row["frequency"],
+                "interval": row["interval"],
                 "id": row["id"],
             }
             for row in rows
