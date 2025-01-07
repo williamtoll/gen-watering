@@ -149,7 +149,7 @@ async def get_schedules():
     try:
         conn = await connect_db()
         query = """
-        SELECT s.*, d.name as device_name, s.status, d.id as device_id 
+        SELECT s.*, d.name as device_name, s.status, d.id as device_id, d.color as device_color
         FROM schedule s
         JOIN device d ON s.fk_device_schedule = d.id
         ORDER BY s.start_date desc;
@@ -168,6 +168,7 @@ async def get_schedules():
                 "status": row["status"],
                 "frequency": row["frequency"],
                 "interval": row["interval"],
+                "color": row["device_color"],
                 "id": row["id"],
             }
             for row in rows
