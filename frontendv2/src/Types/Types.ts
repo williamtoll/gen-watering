@@ -68,3 +68,9 @@ export interface FormData {
   frequency: 'daily' | 'weekly' | 'monthly';
   interval: number;
 }
+
+export interface DeviceStatus {
+  id: number;
+  name: string;
+  status: boolean;
+}

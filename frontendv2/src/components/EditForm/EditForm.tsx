@@ -35,12 +35,15 @@ interface EditFormProps {
   onClose: () => void;
 }
 
+const BASE_URL = 'http://localhost:8000/api';
+
+
 export const EditForm: React.FC<EditFormProps> = ({ eventData, onClose }) => {
   const queryClient = useQueryClient();
   const mutation = useMutation({
     mutationFn: (updatedSchedule: scheduleItemToSendRaw) => {
       return axios.put(
-        `http://172.233.17.232:8000/api/update_schedule/${eventData.id}`,
+        `${BASE_URL}/update_schedule/${eventData.id}`,
         updatedSchedule
       );
     },

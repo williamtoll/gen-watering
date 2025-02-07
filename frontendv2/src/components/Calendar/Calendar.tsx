@@ -15,6 +15,9 @@ import { PreviewModal } from '../PreviewModal/PreviewModal';
 import axios from 'axios';
 import { useQueryClient } from '@tanstack/react-query';
 
+const BASE_URL = 'http://localhost:8000/api';
+
+
 export const Calendar: React.FC<{ data: scheduleItem[] }> = ({ data }) => {
   const { toggleSidebar } = useApp();
   const isMobile = useIsMobile();
@@ -39,7 +42,7 @@ export const Calendar: React.FC<{ data: scheduleItem[] }> = ({ data }) => {
   const handleDelete = async () => {
     if (selectedEvent) {
       try {
-        await axios.delete(`http://172.233.17.232:8000/api/delete_schedule/${selectedEvent.id}`);
+        await axios.delete(`${BASE_URL}/schedules/${selectedEvent.id}`);
         queryClient.invalidateQueries({ queryKey: ['getSchedules'] });
         setIsPreviewModalOpen(false);
       } catch (error) {

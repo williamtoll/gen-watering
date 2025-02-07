@@ -30,6 +30,8 @@ const schema = yup
   })
   .required();
 
+const BASE_URL = 'http://localhost:8000/api';
+
 export const SideForm: React.FC = () => {
   const {
     closeSidebar,
@@ -43,7 +45,7 @@ export const SideForm: React.FC = () => {
   const mutation = useMutation({
     mutationFn: (newSchedule: scheduleItemToSendRaw) => {
       return axios.post(
-        'http://172.233.17.232:8000/api/new_schedule',
+        `${BASE_URL}/new_schedule`,
         newSchedule
       );
     },
