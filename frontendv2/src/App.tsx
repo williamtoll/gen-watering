@@ -8,7 +8,7 @@ export default function App() {
     <Router>
       <Routes>
         {/* <Route path="/" element={<Home />} /> */}
-        <Route path="/calendar" element={<CalendarPage />} />
+        <Route path="/" element={<CalendarPage />} />
         <Route path="/device-control" element={<DeviceControlPage />} />
 
       </Routes>
