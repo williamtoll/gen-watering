@@ -1,3 +1,4 @@
+import platform
 from fastapi import FastAPI, Query, HTTPException, Path
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
@@ -33,7 +34,7 @@ app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=["http://localhost:3000","https://smartwatering.lat","http://localhost"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -51,6 +52,7 @@ FREQUENCY_MAP = {
 class DeviceResponse(BaseModel):
     id: int
     name: str
+    is_running: bool
 
 
 class ScheduleRequest(BaseModel):
@@ -82,15 +84,26 @@ async def connect_db():
         user=DB_USER, password=DB_PASSWORD, database=DB_NAME, host=DB_HOST, port=DB_PORT
     )
 
+def is_raspberry_pi():
+    return 'raspberrypi' in platform.uname().node
+
+
+if is_raspberry_pi():
+
+    import RPi.GPIO as GPIO
+
+    # GPIO setup
+    GPIO.setmode(GPIO.BCM)  # Use Broadcom pin-numbering
+    GPIO.setwarnings(False)
 
 @app.get("/api/devices", response_model=List[DeviceResponse])
 async def get_devices():
     """Fetch the list of devices."""
     try:
         conn = await connect_db()
-        rows = await conn.fetch("SELECT id, name FROM device")
+        rows = await conn.fetch("SELECT id, name,is_running FROM device order by id")
         await conn.close()
-        return [{"id": row["id"], "name": row["name"]} for row in rows]
+        return [{"id": row["id"], "name": row["name"],"is_running":row["is_running"]} for row in rows]
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
@@ -101,7 +114,7 @@ async def get_schedules():
     try:
         conn = await connect_db()
         query = """
-        SELECT s.id, s.start_date, s.end_date,extract(EPOCH from	(end_date - start_date)) / 60 as duration_minutes, d.name as device_name, s.status, d.id as device_id 
+        SELECT s.id, s.start_date, s.end_date,extract(EPOCH from	(end_date - start_date)) / 60 as duration_minutes, d.name as device_name, s.status, d.id as device_id,frequency,interval 
         FROM schedule s
         JOIN device d ON s.fk_device_schedule = d.id
         where s.start_date >= CURRENT_DATE - INTERVAL '1 month'
@@ -308,6 +321,56 @@ async def delete_schedule(
         return APIResponse(
             status="error", message="Failed to delete schedule.", error_reason=str(e)
         )
+
+
+
+def start_watering(relay_port, device_id, device_name):
+    """Activates the relay on the specified port."""
+    logging.info(
+        f"Try Start Watering  {device_id} {device_name} on relay port {relay_port} ."
+    )
+    # GPIO.setup(relay_port, GPIO.OUT)
+    # GPIO.output(relay_port, True)
+    logging.info(
+        f"Watering started  {device_id} {device_name} on relay port {relay_port} ."
+    )
+
+
+def stop_watering(relay_port, device_id, device_name):
+    """Deactivates the relay on the specified port."""
+    logging.info(
+        f"Try Stop Watering  {device_id} {device_name} on relay port {relay_port} ."
+    )
+    # GPIO.output(relay_port, False)
+    logging.info(
+        f"Watering stopped  {device_id} {device_name} on relay port {relay_port} ."
+    )
+
+
+async def update_device_status(conn, device_id: int, status:bool):
+    """Updates the status of a device"""
+    print("updating device $1 status ", device_id,str(status).lower)
+    await conn.execute("UPDATE device SET is_running = $1 WHERE id = $2", status,device_id)
+
+@app.post("/api/device/{device_id}/toggle")
+async def toggle_device(device_id: int = Path(..., description="Device ID")): 
+    try:
+        conn = await connect_db()
+        rows = await conn.fetch("SELECT id, name,is_running,relay_port FROM device where id=$1",device_id)
+        print("rows ",rows)
+        print("is running ",rows[0]["is_running"])
+        if rows[0]["is_running"]:
+            stop_watering(relay_port=rows[0]["relay_port"],device_id=rows[0]["id"],device_name=rows[0]["name"])
+            await update_device_status(conn,device_id,False)
+
+        else:
+            start_watering(relay_port=rows[0]["relay_port"],device_id=rows[0]["id"],device_name=rows[0]["name"])
+            await update_device_status(conn,device_id,True)
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+    finally:
+        await conn.close()
 
 
 # update schedule
