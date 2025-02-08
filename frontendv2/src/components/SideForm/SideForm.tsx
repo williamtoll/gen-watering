@@ -9,6 +9,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { scheduleItemToSendRaw } from '../../Types/Types';
 import axios from 'axios';
 import { useApp } from '../../context/AppProvider/AppProvider';
+import { BASE_URL } from '../../Config';
 const schema = yup
   .object({
     id: yup.string().optional(),
@@ -29,8 +30,6 @@ const schema = yup
     interval: yup.mixed().required('Intervalo es requerido'),
   })
   .required();
-
-const BASE_URL = 'http://localhost:8000/api';
 
 export const SideForm: React.FC = () => {
   const {

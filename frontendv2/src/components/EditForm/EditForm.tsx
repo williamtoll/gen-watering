@@ -8,6 +8,7 @@ import { formatFormDataForApi } from '../../Utils/Utils';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { scheduleItemToSendRaw } from '../../Types/Types';
 import axios from 'axios';
+import { BASE_URL } from '../../Config';
 
 const schema = yup
   .object({
@@ -34,9 +35,6 @@ interface EditFormProps {
   eventData: any;
   onClose: () => void;
 }
-
-const BASE_URL = 'http://localhost:8000/api';
-
 
 export const EditForm: React.FC<EditFormProps> = ({ eventData, onClose }) => {
   const queryClient = useQueryClient();

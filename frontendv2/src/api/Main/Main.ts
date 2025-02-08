@@ -1,8 +1,5 @@
+import { BASE_URL } from '../../Config';
 import { apiResponseDevices } from '../../Types/Types';
-
-// const BASE_URL = 'http://172.233.17.232:8000/api/';
-// const BASE_URL = 'https://www.smartwatering.lat/api/';
-const BASE_URL = 'http://localhost:8000/api';
 
 export const getSchedules = () =>
   fetch(`${BASE_URL}/schedules`).then((res) => res.json());

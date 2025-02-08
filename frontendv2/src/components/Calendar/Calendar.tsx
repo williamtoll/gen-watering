@@ -14,8 +14,7 @@ import { EditForm } from '../EditForm/EditForm';
 import { PreviewModal } from '../PreviewModal/PreviewModal';
 import axios from 'axios';
 import { useQueryClient } from '@tanstack/react-query';
-
-const BASE_URL = 'http://localhost:8000/api';
+import { BASE_URL } from '../../Config';
 
 
 export const Calendar: React.FC<{ data: scheduleItem[] }> = ({ data }) => {

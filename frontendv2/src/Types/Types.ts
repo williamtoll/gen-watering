@@ -72,5 +72,5 @@ export interface FormData {
 export interface DeviceStatus {
   id: number;
   name: string;
-  status: boolean;
+  is_running: boolean;
 }
