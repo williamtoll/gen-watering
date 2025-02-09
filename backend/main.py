@@ -34,7 +34,7 @@ app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000","https://smartwatering.lat","http://localhost"],
+    allow_origins=["http://localhost:3000","http://localhost:3001","https://smartwatering.lat","http://localhost","*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -114,7 +114,8 @@ async def get_schedules():
     try:
         conn = await connect_db()
         query = """
-        SELECT s.id, s.start_date, s.end_date,extract(EPOCH from	(end_date - start_date)) / 60 as duration_minutes, d.name as device_name, s.status, d.id as device_id,frequency,interval 
+        SELECT s.id, s.start_date, s.end_date,duration as duration_minutes, d.name as device_name, s.status, d.id as device_id,frequency,interval,
+        d.color as device_color 
         FROM schedule s
         JOIN device d ON s.fk_device_schedule = d.id
         where s.start_date >= CURRENT_DATE - INTERVAL '1 month'
@@ -197,7 +198,7 @@ async def get_schedules():
         )
 
 @app.post("/api/generate_schedule", response_model=APIResponse)
-async def generate_schedule(request: ScheduleRequest):
+async def generate_new_schedule(request: ScheduleRequest):
     logging.info("request")
     logging.info(request)
     """Generate recurring schedules based on input parameters."""
@@ -215,14 +216,26 @@ async def generate_schedule(request: ScheduleRequest):
         byweekday=request.byweekday,
     )
 
-    # # Convert occurrences to ISO 8601 format strings
-    # occurrences = [occurrence.isoformat() for occurrence in rule]
-
+    logging.info('rule ',rule)
+    
     # Calculate event occurrences and end times
     occurrences = []
+
+
+
     for start in rule:
-        end = start + timedelta(minutes=request.duration)
-        occurrences.append({"start": start, "end": end})
+
+        dt = datetime.datetime(start)
+        tm = datetime.time(request.time)
+
+        date_combined = dt.combine(dt, tm)
+        logging.info("date_combined ",date_combined)
+
+        end = date_combined + timedelta(minutes=request.duration)
+        occurrences.append({"start": start, "end": end,"freq":request.frequency,"interval":request.interval})
+
+    # # Convert occurrences to ISO 8601 format strings
+    # occurrences = [occurrence.isoformat() for occurrence in rule]
 
     logging.info("ocurrences")
     logging.info(occurrences)
@@ -233,11 +246,13 @@ async def generate_schedule(request: ScheduleRequest):
         async with conn.transaction():
             for occ in occurrences:
                 await conn.execute(
-                    "INSERT INTO schedule (start_date, end_date, fk_device_schedule, duration,  status) VALUES ($1, $2, $3, $4,'pending')",
-                    occ["start"],
-                    occ["end"],
+                    "INSERT INTO schedule (start_date, end_date, fk_device_schedule, duration,  status,interval,frequency) VALUES ($1, $2, $3, $4,'pending',$5,$6)",
+                    occ["start"].isoformat(),
+                    occ["end"].isoformat(),
                     request.device_id,
                     timedelta(minutes=request.duration),
+                    occ["interval"],
+                    occ["freq"]
                 )
 
                 logging.info("inserted successfully")
