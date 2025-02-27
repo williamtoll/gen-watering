@@ -118,7 +118,7 @@ async def get_schedules():
     try:
         conn = await connect_db()
         query = """
-        SELECT s.id, s.start_date AT TIME ZONE 'America/Asuncion' as start_date, s.end_date AT TIME ZONE 'America/Asuncion' as end_date,duration as duration_minutes, d.name as device_name, s.status, d.id as device_id,frequency,interval,
+        SELECT s.id, s.start_date AT TIME ZONE 'America/Asuncion' as start_date, s.end_date AT TIME ZONE 'America/Asuncion' as end_date,CAST(EXTRACT(EPOCH FROM duration) / 60 AS INTEGER) as duration_minutes, d.name as device_name, s.status, d.id as device_id,frequency,interval,
         d.color as device_color 
         FROM schedule s
         JOIN device d ON s.fk_device_schedule = d.id
@@ -132,7 +132,7 @@ async def get_schedules():
 
         schedules = [
             {
-                "title": f"{row['device_name']} ({row['duration_minutes']}) min",
+                "title": f"{row['device_name']} ({row['duration_minutes']} min )",
                 "start": pytz.timezone("America/Asuncion").localize(row["start_date"]).isoformat(),
                 "end": pytz.timezone("America/Asuncion").localize(row["end_date"]).isoformat(),
                 "duration_minutes": row["duration_minutes"],
