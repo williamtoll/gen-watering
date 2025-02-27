@@ -81,8 +81,8 @@ export const Calendar: React.FC<{ data: scheduleItem[] }> = ({ data }) => {
             events={data}
             eventClick={handleEventClick}
             locale={esLocale}
-            plugins={[dayGridPlugin, timeGridPlugin, listPlugin]}
-            initialView={isMobile ? 'listWeek' : 'dayGridMonth'}
+            plugins={[dayGridPlugin,timeGridPlugin, listPlugin]}
+            initialView={isMobile ? 'listWeek' : 'timeGridWeek'}
             headerToolbar={{
               left: 'prev,next today',
               center: 'title',

@@ -64,12 +64,12 @@ export const EditForm: React.FC<EditFormProps> = ({ eventData, onClose }) => {
         id: eventData.extendedProps.device_id,
         name: eventData.deviceName,
       },
-      date: eventData.start.split('T')[0],
-      time: eventData.start.split('T')[1].slice(0, 5),
+      start_date: eventData.start_date,
       duration: eventData.durationMinutes,
-      endDate: eventData.end.split('T')[0],
-      frequency: eventData.extendedProps.frequency || 'daily',
-      interval: parseInt(eventData.extendedProps.frequency) || 1,
+      end_date: eventData.end_date,
+      // frequency: eventData.extendedProps.frequency || 'daily',
+      frequency: 'daily',
+      interval: parseInt(eventData.extendedProps.interval) || 1,
     },
   });
 
@@ -97,9 +97,9 @@ export const EditForm: React.FC<EditFormProps> = ({ eventData, onClose }) => {
         <label htmlFor="date" className="block text-sm font-medium text-gray-900">
           Fecha de inicio
         </label>
-        <input type="date" {...register('date')} className={inputClassName} />
-        {errors.date && (
-          <p className="text-red-500 text-sm">{errors.date.message}</p>
+        <input type="date" {...register('start_date')} className={inputClassName} />
+        {errors.start_date && (
+          <p className="text-red-500 text-sm">{errors.start_date.message}</p>
         )}
       </div>
 
@@ -127,9 +127,9 @@ export const EditForm: React.FC<EditFormProps> = ({ eventData, onClose }) => {
         <label htmlFor="endDate" className="block text-sm font-medium text-gray-900">
           Fecha de Fin
         </label>
-        <input type="date" {...register('endDate')} className={inputClassName} />
-        {errors.endDate && (
-          <p className="text-red-500 text-sm">{errors.endDate.message}</p>
+        <input type="date" {...register('end_date')} className={inputClassName} />
+        {errors.end_date && (
+          <p className="text-red-500 text-sm">{errors.end_date.message}</p>
         )}
       </div>
 

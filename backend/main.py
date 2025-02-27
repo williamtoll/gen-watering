@@ -2,7 +2,7 @@ import platform
 from fastapi import FastAPI, Query, HTTPException, Path
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from dateutil.rrule import rrule, DAILY, WEEKLY, MONTHLY, YEARLY
 import asyncpg
 from response_model import APIResponse  # Import the response model
@@ -11,6 +11,9 @@ import os
 import logging
 import pendulum
 from fastapi.middleware.cors import CORSMiddleware
+import re
+import pytz
+
 load_dotenv()
 
 # Configure logging
@@ -70,6 +73,7 @@ class ScheduleRequest(BaseModel):
     )
     device_id: int
     duration: int  # Duration in minutes
+    time: str
 
 
 class ScheduleResponse(BaseModel):
@@ -114,7 +118,7 @@ async def get_schedules():
     try:
         conn = await connect_db()
         query = """
-        SELECT s.id, s.start_date, s.end_date,duration as duration_minutes, d.name as device_name, s.status, d.id as device_id,frequency,interval,
+        SELECT s.id, s.start_date AT TIME ZONE 'America/Asuncion' as start_date, s.end_date AT TIME ZONE 'America/Asuncion' as end_date,duration as duration_minutes, d.name as device_name, s.status, d.id as device_id,frequency,interval,
         d.color as device_color 
         FROM schedule s
         JOIN device d ON s.fk_device_schedule = d.id
@@ -124,11 +128,13 @@ async def get_schedules():
         rows = await conn.fetch(query)
         await conn.close()
 
+
+
         schedules = [
             {
                 "title": f"{row['device_name']} ({row['duration_minutes']}) min",
-                "start": row["start_date"].isoformat(),
-                "end": row["end_date"].isoformat(),
+                "start": pytz.timezone("America/Asuncion").localize(row["start_date"]).isoformat(),
+                "end": pytz.timezone("America/Asuncion").localize(row["end_date"]).isoformat(),
                 "duration_minutes": row["duration_minutes"],
                 "device_name": row["device_name"],
                 "status": row["status"],
@@ -137,6 +143,8 @@ async def get_schedules():
             }
             for row in rows
         ]
+
+        
         return APIResponse(
             status="success",
             message="Schedules fetched successfully.",
@@ -207,10 +215,22 @@ async def generate_new_schedule(request: ScheduleRequest):
             "error": "Invalid frequency. Choose from: daily, weekly, monthly, yearly."
         }
 
+    logging.info("request date",request.start_date)
+    time_obj = datetime.strptime(request.time, "%H:%M:%S").time()
+
+    start_date = datetime.now().replace(hour=time_obj.hour, minute=time_obj.minute, second=time_obj.second)
+
+    local_dt = pytz.timezone("America/Asuncion").localize(start_date)  # Change timezone as needed
+    start_utc = local_dt.astimezone(pytz.utc)
+    logging.info("start_utc ",start_utc)
+
+    local_dt = pytz.timezone("America/Asuncion").localize(request.end_date)  # Change timezone as needed
+    end_utc = request.end_date.astimezone(pytz.utc)
+
     rule = rrule(
         freq=FREQUENCY_MAP[request.frequency],
-        dtstart=request.start_date,
-        until=request.end_date,
+        dtstart=start_utc,
+        until=end_utc,
         interval=request.interval,
         count=request.count,
         byweekday=request.byweekday,
@@ -224,15 +244,28 @@ async def generate_new_schedule(request: ScheduleRequest):
 
 
     for start in rule:
+        
+        date = re.findall('\d{4}-\d{2}-\d{2}', str(start))[0]
+        dt_str = f"{date} {request.time}"  # Adding seconds
+        logging.info("date ",dt_str)
+        dt_obj = datetime.strptime(dt_str, "%Y-%m-%d %H:%M:%S")
+        # dt_obj = dt_obj.replace(tzinfo=timezone.utc).timestamp()
+        # dt_obj = datetime.date(dt_obj, "%Y-%m-%d %H:%M:%S")
 
-        dt = datetime.datetime(start)
-        tm = datetime.time(request.time)
+        logging.info("date_combined ",dt_obj)
 
-        date_combined = dt.combine(dt, tm)
-        logging.info("date_combined ",date_combined)
+        end = dt_obj + timedelta(minutes=request.duration)
 
-        end = date_combined + timedelta(minutes=request.duration)
-        occurrences.append({"start": start, "end": end,"freq":request.frequency,"interval":request.interval})
+        local_dt = pytz.timezone("America/Asuncion").localize(dt_obj)  # Change timezone as needed
+        start_utc = local_dt.astimezone(pytz.utc)
+        logging.info("start_utc ",start_utc)
+
+        local_dt = pytz.timezone("America/Asuncion").localize(end)  # Change timezone as needed
+        end_utc = end.astimezone(pytz.utc)
+        logging.info("end_utc ",end_utc)
+
+
+        occurrences.append({"start": start_utc, "end": end_utc,"freq":request.frequency,"interval":request.interval})
 
     # # Convert occurrences to ISO 8601 format strings
     # occurrences = [occurrence.isoformat() for occurrence in rule]
@@ -247,8 +280,8 @@ async def generate_new_schedule(request: ScheduleRequest):
             for occ in occurrences:
                 await conn.execute(
                     "INSERT INTO schedule (start_date, end_date, fk_device_schedule, duration,  status,interval,frequency) VALUES ($1, $2, $3, $4,'pending',$5,$6)",
-                    occ["start"].isoformat(),
-                    occ["end"].isoformat(),
+                    occ["start"],
+                    occ["end"],
                     request.device_id,
                     timedelta(minutes=request.duration),
                     occ["interval"],

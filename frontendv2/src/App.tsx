@@ -10,6 +10,8 @@ export default function App() {
         {/* <Route path="/" element={<Home />} /> */}
         <Route path="/" element={<CalendarPage />} />
         <Route path="/device-control" element={<DeviceControlPage />} />
+        <Route path="/calendar" element={<CalendarPage />} />
+
 
       </Routes>
     </Router>
