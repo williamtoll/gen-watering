@@ -61,10 +61,16 @@ export interface FormData {
     id: string;
     name: string;
   };
-  date: string;
+  start_date: string;
   time: string;
   duration: number;
-  endDate: string;
+  end_date: string;
   frequency: 'daily' | 'weekly' | 'monthly';
   interval: number;
+}
+
+export interface DeviceStatus {
+  id: number;
+  name: string;
+  is_running: boolean;
 }

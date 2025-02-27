@@ -1,7 +1,8 @@
+import platform
 from fastapi import FastAPI, Query, HTTPException, Path
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from dateutil.rrule import rrule, DAILY, WEEKLY, MONTHLY, YEARLY
 import asyncpg
 from response_model import APIResponse  # Import the response model
@@ -10,6 +11,9 @@ import os
 import logging
 import pendulum
 from fastapi.middleware.cors import CORSMiddleware
+import re
+import pytz
+
 load_dotenv()
 
 # Configure logging
@@ -33,7 +37,7 @@ app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=["http://localhost:3000","http://localhost:3001","https://smartwatering.lat","http://localhost","*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -51,6 +55,7 @@ FREQUENCY_MAP = {
 class DeviceResponse(BaseModel):
     id: int
     name: str
+    is_running: bool
 
 
 class ScheduleRequest(BaseModel):
@@ -68,6 +73,7 @@ class ScheduleRequest(BaseModel):
     )
     device_id: int
     duration: int  # Duration in minutes
+    time: str
 
 
 class ScheduleResponse(BaseModel):
@@ -82,15 +88,26 @@ async def connect_db():
         user=DB_USER, password=DB_PASSWORD, database=DB_NAME, host=DB_HOST, port=DB_PORT
     )
 
+def is_raspberry_pi():
+    return 'raspberrypi' in platform.uname().node
+
+
+if is_raspberry_pi():
+
+    import RPi.GPIO as GPIO
+
+    # GPIO setup
+    GPIO.setmode(GPIO.BCM)  # Use Broadcom pin-numbering
+    GPIO.setwarnings(False)
 
 @app.get("/api/devices", response_model=List[DeviceResponse])
 async def get_devices():
     """Fetch the list of devices."""
     try:
         conn = await connect_db()
-        rows = await conn.fetch("SELECT id, name FROM device")
+        rows = await conn.fetch("SELECT id, name,is_running FROM device order by id")
         await conn.close()
-        return [{"id": row["id"], "name": row["name"]} for row in rows]
+        return [{"id": row["id"], "name": row["name"],"is_running":row["is_running"]} for row in rows]
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
@@ -101,7 +118,8 @@ async def get_schedules():
     try:
         conn = await connect_db()
         query = """
-        SELECT s.id, s.start_date, s.end_date,extract(EPOCH from	(end_date - start_date)) / 60 as duration_minutes, d.name as device_name, s.status, d.id as device_id 
+        SELECT s.id, s.start_date AT TIME ZONE 'America/Asuncion' as start_date, s.end_date AT TIME ZONE 'America/Asuncion' as end_date,CAST(EXTRACT(EPOCH FROM duration) / 60 AS INTEGER) as duration_minutes, d.name as device_name, s.status, d.id as device_id,frequency,interval,
+        d.color as device_color 
         FROM schedule s
         JOIN device d ON s.fk_device_schedule = d.id
         where s.start_date >= CURRENT_DATE - INTERVAL '1 month'
@@ -110,11 +128,13 @@ async def get_schedules():
         rows = await conn.fetch(query)
         await conn.close()
 
+
+
         schedules = [
             {
-                "title": f"{row['device_name']} ({row['duration_minutes']}) min",
-                "start": row["start_date"].isoformat(),
-                "end": row["end_date"].isoformat(),
+                "title": f"{row['device_name']} ({row['duration_minutes']} min )",
+                "start": pytz.timezone("America/Asuncion").localize(row["start_date"]).isoformat(),
+                "end": pytz.timezone("America/Asuncion").localize(row["end_date"]).isoformat(),
                 "duration_minutes": row["duration_minutes"],
                 "device_name": row["device_name"],
                 "status": row["status"],
@@ -123,6 +143,8 @@ async def get_schedules():
             }
             for row in rows
         ]
+
+        
         return APIResponse(
             status="success",
             message="Schedules fetched successfully.",
@@ -184,7 +206,7 @@ async def get_schedules():
         )
 
 @app.post("/api/generate_schedule", response_model=APIResponse)
-async def generate_schedule(request: ScheduleRequest):
+async def generate_new_schedule(request: ScheduleRequest):
     logging.info("request")
     logging.info(request)
     """Generate recurring schedules based on input parameters."""
@@ -193,23 +215,60 @@ async def generate_schedule(request: ScheduleRequest):
             "error": "Invalid frequency. Choose from: daily, weekly, monthly, yearly."
         }
 
+    logging.info("request date",request.start_date)
+    time_obj = datetime.strptime(request.time, "%H:%M:%S").time()
+
+    start_date = datetime.now().replace(hour=time_obj.hour, minute=time_obj.minute, second=time_obj.second)
+
+    local_dt = pytz.timezone("America/Asuncion").localize(start_date)  # Change timezone as needed
+    start_utc = local_dt.astimezone(pytz.utc)
+    logging.info("start_utc ",start_utc)
+
+    local_dt = pytz.timezone("America/Asuncion").localize(request.end_date)  # Change timezone as needed
+    end_utc = request.end_date.astimezone(pytz.utc)
+
     rule = rrule(
         freq=FREQUENCY_MAP[request.frequency],
-        dtstart=request.start_date,
-        until=request.end_date,
+        dtstart=start_utc,
+        until=end_utc,
         interval=request.interval,
         count=request.count,
         byweekday=request.byweekday,
     )
 
-    # # Convert occurrences to ISO 8601 format strings
-    # occurrences = [occurrence.isoformat() for occurrence in rule]
-
+    logging.info('rule ',rule)
+    
     # Calculate event occurrences and end times
     occurrences = []
+
+
+
     for start in rule:
-        end = start + timedelta(minutes=request.duration)
-        occurrences.append({"start": start, "end": end})
+        
+        date = re.findall('\d{4}-\d{2}-\d{2}', str(start))[0]
+        dt_str = f"{date} {request.time}"  # Adding seconds
+        logging.info("date ",dt_str)
+        dt_obj = datetime.strptime(dt_str, "%Y-%m-%d %H:%M:%S")
+        # dt_obj = dt_obj.replace(tzinfo=timezone.utc).timestamp()
+        # dt_obj = datetime.date(dt_obj, "%Y-%m-%d %H:%M:%S")
+
+        logging.info("date_combined ",dt_obj)
+
+        end = dt_obj + timedelta(minutes=request.duration)
+
+        local_dt = pytz.timezone("America/Asuncion").localize(dt_obj)  # Change timezone as needed
+        start_utc = local_dt.astimezone(pytz.utc)
+        logging.info("start_utc ",start_utc)
+
+        local_dt = pytz.timezone("America/Asuncion").localize(end)  # Change timezone as needed
+        end_utc = end.astimezone(pytz.utc)
+        logging.info("end_utc ",end_utc)
+
+
+        occurrences.append({"start": start_utc, "end": end_utc,"freq":request.frequency,"interval":request.interval})
+
+    # # Convert occurrences to ISO 8601 format strings
+    # occurrences = [occurrence.isoformat() for occurrence in rule]
 
     logging.info("ocurrences")
     logging.info(occurrences)
@@ -220,11 +279,13 @@ async def generate_schedule(request: ScheduleRequest):
         async with conn.transaction():
             for occ in occurrences:
                 await conn.execute(
-                    "INSERT INTO schedule (start_date, end_date, fk_device_schedule, duration,  status) VALUES ($1, $2, $3, $4,'pending')",
+                    "INSERT INTO schedule (start_date, end_date, fk_device_schedule, duration,  status,interval,frequency) VALUES ($1, $2, $3, $4,'pending',$5,$6)",
                     occ["start"],
                     occ["end"],
                     request.device_id,
                     timedelta(minutes=request.duration),
+                    occ["interval"],
+                    occ["freq"]
                 )
 
                 logging.info("inserted successfully")
@@ -308,6 +369,56 @@ async def delete_schedule(
         return APIResponse(
             status="error", message="Failed to delete schedule.", error_reason=str(e)
         )
+
+
+
+def start_watering(relay_port, device_id, device_name):
+    """Activates the relay on the specified port."""
+    logging.info(
+        f"Try Start Watering  {device_id} {device_name} on relay port {relay_port} ."
+    )
+    # GPIO.setup(relay_port, GPIO.OUT)
+    # GPIO.output(relay_port, True)
+    logging.info(
+        f"Watering started  {device_id} {device_name} on relay port {relay_port} ."
+    )
+
+
+def stop_watering(relay_port, device_id, device_name):
+    """Deactivates the relay on the specified port."""
+    logging.info(
+        f"Try Stop Watering  {device_id} {device_name} on relay port {relay_port} ."
+    )
+    # GPIO.output(relay_port, False)
+    logging.info(
+        f"Watering stopped  {device_id} {device_name} on relay port {relay_port} ."
+    )
+
+
+async def update_device_status(conn, device_id: int, status:bool):
+    """Updates the status of a device"""
+    print("updating device $1 status ", device_id,str(status).lower)
+    await conn.execute("UPDATE device SET is_running = $1 WHERE id = $2", status,device_id)
+
+@app.post("/api/device/{device_id}/toggle")
+async def toggle_device(device_id: int = Path(..., description="Device ID")): 
+    try:
+        conn = await connect_db()
+        rows = await conn.fetch("SELECT id, name,is_running,relay_port FROM device where id=$1",device_id)
+        print("rows ",rows)
+        print("is running ",rows[0]["is_running"])
+        if rows[0]["is_running"]:
+            stop_watering(relay_port=rows[0]["relay_port"],device_id=rows[0]["id"],device_name=rows[0]["name"])
+            await update_device_status(conn,device_id,False)
+
+        else:
+            start_watering(relay_port=rows[0]["relay_port"],device_id=rows[0]["id"],device_name=rows[0]["name"])
+            await update_device_status(conn,device_id,True)
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+    finally:
+        await conn.close()
 
 
 # update schedule

@@ -38,11 +38,11 @@ export const scheduleItemToSendRawMap = (
     duration: data.duration,
     end: data.time,
     device_id: data.id,
-    end_date: data.endDate,
+    end_date: data.end_date,
     status: 'pending',
     title: data.device.name,
-    start_date: data.date,
-    frequency: String(data.interval),
+    start_date: data.start_date,
+    frequency: String(data.frequency),
   };
 };
 
@@ -52,10 +52,10 @@ export const formatFormDataForApi = (data: FormData): scheduleItemToSendRaw => {
     duration: Number(data.duration),
     end: data.time,
     device_id: data.device.id,
-    end_date: data.endDate,
+    end_date: data.end_date,
     status: 'pending',
     title: data.device.name,
-    start_date: data.date,
-    frequency: String(data.interval),
+    start_date: data.start_date,
+    frequency: String(data.frequency),
   };
 };

@@ -1,7 +1,24 @@
 # main.py
+from backend.main import connect_db
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from typing import List
+import logging
+import platform
+
+
+import RPi.GPIO as GPIO
+
+# GPIO setup
+GPIO.setmode(GPIO.BCM)  # Use Broadcom pin-numbering
+GPIO.setwarnings(False)
+
+# Configure logging
+logging.basicConfig(
+    filename="/home/pi/watering_service.log",  # Path to log file
+    level=logging.INFO,  # Log INFO level and above
+    format="%(asctime)s - %(levelname)s - %(message)s",
+)
 
 app = FastAPI()
 
@@ -13,6 +30,10 @@ class Device(BaseModel):
     id: int
     name: str
     relay_port: int
+
+
+
+
 
 # Endpoint to list all devices
 @app.get("/devices", response_model=List[Device])

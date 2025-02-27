@@ -9,6 +9,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { scheduleItemToSendRaw } from '../../Types/Types';
 import axios from 'axios';
 import { useApp } from '../../context/AppProvider/AppProvider';
+import { BASE_URL } from '../../Config';
 const schema = yup
   .object({
     id: yup.string().optional(),
@@ -18,10 +19,10 @@ const schema = yup
         name: yup.string().required('Nombre del dispositivo es requerido'),
       })
       .required(),
-    date: yup.string().required('Fecha de inicio es requerida'),
+    start_date: yup.string().required('Fecha de inicio es requerida'),
     time: yup.string().required('Hora de inicio es requerida'),
     duration: yup.mixed().required('Duración es requerida'),
-    endDate: yup.string().required('Fecha de fin es requerida'),
+    end_date: yup.string().required('Fecha de fin es requerida'),
     frequency: yup
       .string()
       .oneOf(['daily', 'weekly', 'monthly'])
@@ -43,7 +44,7 @@ export const SideForm: React.FC = () => {
   const mutation = useMutation({
     mutationFn: (newSchedule: scheduleItemToSendRaw) => {
       return axios.post(
-        'http://172.233.17.232:8000/api/new_schedule',
+        `${BASE_URL}/generate_schedule`,
         newSchedule
       );
     },
@@ -103,9 +104,9 @@ export const SideForm: React.FC = () => {
           >
             Fecha de inicio
           </label>
-          <input type="date" {...register('date')} className={inputClassName} />
-          {errors.date && (
-            <p className="text-red-500 text-sm">{errors.date.message}</p>
+          <input type="date" {...register('start_date')} className={inputClassName} />
+          {errors.start_date && (
+            <p className="text-red-500 text-sm">{errors.start_date.message}</p>
           )}
         </div>
 
@@ -151,11 +152,11 @@ export const SideForm: React.FC = () => {
           </label>
           <input
             type="date"
-            {...register('endDate')}
+            {...register('end_date')}
             className={inputClassName}
           />
-          {errors.endDate && (
-            <p className="text-red-500 text-sm">{errors.endDate.message}</p>
+          {errors.end_date && (
+            <p className="text-red-500 text-sm">{errors.end_date.message}</p>
           )}
         </div>
 
@@ -167,9 +168,9 @@ export const SideForm: React.FC = () => {
           >
             Frecuencia
           </label>
-          <select {...register('frequency')} className={inputClassName}>
-            <option value="">Seleccionar Frecuencia</option>
-            <option value="daily">Diario</option>
+          <select defaultValue={'daily'} {...register('frequency')} className={inputClassName}>
+            <option value="" >Seleccionar Frecuencia</option>
+            <option value="daily" >Diario</option>
             <option value="weekly">Semanal</option>
             <option value="monthly">Mensual</option>
           </select>

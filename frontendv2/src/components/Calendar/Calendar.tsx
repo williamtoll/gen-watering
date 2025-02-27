@@ -14,6 +14,8 @@ import { EditForm } from '../EditForm/EditForm';
 import { PreviewModal } from '../PreviewModal/PreviewModal';
 import axios from 'axios';
 import { useQueryClient } from '@tanstack/react-query';
+import { BASE_URL } from '../../Config';
+
 
 export const Calendar: React.FC<{ data: scheduleItem[] }> = ({ data }) => {
   const { toggleSidebar } = useApp();
@@ -39,7 +41,7 @@ export const Calendar: React.FC<{ data: scheduleItem[] }> = ({ data }) => {
   const handleDelete = async () => {
     if (selectedEvent) {
       try {
-        await axios.delete(`http://172.233.17.232:8000/api/delete_schedule/${selectedEvent.id}`);
+        await axios.delete(`${BASE_URL}/schedules/${selectedEvent.id}`);
         queryClient.invalidateQueries({ queryKey: ['getSchedules'] });
         setIsPreviewModalOpen(false);
       } catch (error) {
@@ -79,8 +81,8 @@ export const Calendar: React.FC<{ data: scheduleItem[] }> = ({ data }) => {
             events={data}
             eventClick={handleEventClick}
             locale={esLocale}
-            plugins={[dayGridPlugin, timeGridPlugin, listPlugin]}
-            initialView={isMobile ? 'listWeek' : 'dayGridMonth'}
+            plugins={[dayGridPlugin,timeGridPlugin, listPlugin]}
+            initialView={isMobile ? 'listWeek' : 'timeGridWeek'}
             headerToolbar={{
               left: 'prev,next today',
               center: 'title',
