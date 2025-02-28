@@ -1,0 +1,46 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+code {
+  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
+    monospace;
+}
+
+@media (max-width: 768px) {
+  .fc-toolbar {
+    display: flex;
+    flex-wrap: wrap; /* Permite que los elementos se apilen cuando no caben */
+    justify-content: space-between; /* Ajusta el espacio entre elementos */
+    align-items: center;
+    gap: 10px; /* Espaciado entre las filas */
+    padding: 2px;
+  }
+
+  .fc-toolbar-title {
+    flex: 1 1 100%; /* Asegura que el título ocupe todo el ancho en una fila propia */
+    text-align: center;
+    font-size: 1.2rem; /* Tamaño ajustado */
+  }
+
+  .fc-toolbar-chunk {
+    display: flex;
+    flex: 1 1 auto; /* Ajusta el tamaño dinámicamente según el espacio disponible */
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .fc-button {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.875rem; /* Ajusta el tamaño del texto para que quepan mejor */
+  }
+}
