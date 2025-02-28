@@ -180,47 +180,6 @@ def formatDuration(duration):
     return f"Duración: {formatted_duration}"
 
 
-@app.get("/api/all-schedules", response_model=APIResponse)
-async def get_schedules():
-    """Fetch schedules with occurrences and device information."""
-    try:
-        conn = await connect_db()
-        query = """
-        SELECT s.*, d.name as device_name, s.status, d.id as device_id, d.color as device_color
-        FROM schedule s
-        JOIN device d ON s.fk_device_schedule = d.id
-        ORDER BY s.start_date desc;
-        """
-        rows = await conn.fetch(query)
-        print(rows)
-        await conn.close()
-        schedules = [
-            {
-                "title": f"{row['device_name']} {formatDuration(row['duration'])} ",
-                "start": row["start_date"].isoformat(),
-                "end": row["end_date"].isoformat(),
-                "duration": f"{row['duration']}",
-                "device_name": row["device_name"],
-                "device_id": row["device_id"],
-                "status": row["status"],
-                "frequency": row["frequency"],
-                "interval": row["interval"],
-                "color": row["device_color"],
-                "id": row["id"],
-            }
-            for row in rows
-        ]
-        return APIResponse(
-            status="success",
-            message="Schedules fetched successfully.",
-            result=schedules,
-        )
-    except Exception as e:
-        return APIResponse(
-            status="error", message="Failed to fetch schedules.", error_reason=str(e)
-        )
-
-
 @app.post("/api/generate_schedule", response_model=APIResponse)
 async def generate_new_schedule(request: ScheduleRequest):
     logging.info("request")
@@ -319,44 +278,6 @@ async def generate_new_schedule(request: ScheduleRequest):
 
                 logging.info("inserted successfully")
                 logging.info(occ)
-        await conn.close()
-        # Convert occurrences to ISO 8601 strings for the response
-        return APIResponse(
-            status="success",
-            message="Schedules saved successfully.",
-            result="",
-        )
-    except Exception as e:
-        logging.info(f"Database error: {str(e)}")
-        return APIResponse(
-            status="error", message="Failed to generate schedule.", error_reason=str(e)
-        )
-
-
-@app.post("/api/new_schedule", response_model=APIResponse)
-async def generate_schedule(request: ScheduleRequest):
-    logging.info("request")
-    logging.info(request)
-    print("entra a crear schedule")
-    print(request)
-    """Generate recurring schedules based on input parameters."""
-    # end = request.start_date + timedelta(minutes=request.duration)
-    # Store occurrences in the PostgreSQL database
-    try:
-        conn = await connect_db()
-        async with conn.transaction():
-            await conn.execute(
-                "INSERT INTO schedule (start_date, end_date, fk_device_schedule, duration, interval, frequency, status) VALUES ($1, $2, $3, $4,$5, $6, 'pending')",
-                request.start_date,
-                request.end_date,
-                request.device_id,
-                timedelta(minutes=request.duration),
-                request.interval,
-                request.frequency,
-            )
-
-            logging.info("inserted successfully")
-
         await conn.close()
         # Convert occurrences to ISO 8601 strings for the response
         return APIResponse(
