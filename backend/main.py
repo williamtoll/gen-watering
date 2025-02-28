@@ -468,4 +468,3 @@ async def update_schedule(
 
 
 
-# Run the server: uvicorn main:app --reload
