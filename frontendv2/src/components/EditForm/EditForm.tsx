@@ -179,4 +179,4 @@ export const EditForm: React.FC<EditFormProps> = ({ eventData, onClose }) => {
       </div>
     </form>
   );
-}; 
+};

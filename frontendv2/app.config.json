@@ -1,11 +1,10 @@
 {
-  apps: [
+  "apps": [
     {
-      name: "smart_watering_ui",
-      script: "npx",
-      interpreter: "none",
-      args: "serve -s build -p 3000",
-    },
+      "name": "smart_watering_ui",
+      "script": "npx",
+      "interpreter": "none",
+      "args": "serve -s build -p 3000"
+    }
   ]
 }
-

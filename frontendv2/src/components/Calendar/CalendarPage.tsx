@@ -7,7 +7,7 @@ import { SideForm } from '../../components/SideForm/SideForm';
 import { Calendar } from '../../components/Calendar/Calendar';
 import { apiResponse } from '../../Types/Types';
 import { SavedCompletedModal } from '../../components/SavedCompletedModal/SavedCompletedModal';
-  
+
 
 const CalendarPage: React.FC = () => {
 

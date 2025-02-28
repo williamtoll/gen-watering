@@ -125,8 +125,8 @@ export const Calendar: React.FC<{ data: scheduleItem[] }> = ({ data }) => {
       )}
 
       {isEditModalOpen && selectedEvent && (
-        <EditModal 
-          isOpen={isEditModalOpen} 
+        <EditModal
+          isOpen={isEditModalOpen}
           onClose={() => setIsEditModalOpen(false)}
         >
           <EditForm
